@@ -251,8 +251,11 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
-### 0.1.0
-- Initial release with full SIE 4B support
-- Command line interface
-- Enum-based account types
-- Real-world compatibility with official SIE4 example 
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
+
+### Latest Release (0.1.0)
+- Complete SIE 4B specification support
+- Comprehensive command-line interface (summary, accounts, vouchers)
+- Enum-based account types with international naming
+- Real-world compatibility with official SIE4 example
+- 88% test coverage with comprehensive test suite 

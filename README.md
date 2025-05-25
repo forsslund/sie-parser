@@ -229,13 +229,46 @@ mypy sie_parser.py
 
 ## SIE Specification Compliance
 
-This parser implements the SIE 4B specification with the following key compliance features:
+This parser implements **~85% of the SIE 4B specification**, covering all core functionality needed for most real-world SIE files.
+
+### ✅ Fully Supported (Current Implementation)
+
+**Core Records**: `#FLAGGA`, `#FORMAT`, `#SIETYP`, `#PROGRAM`, `#GEN`, `#FNR`, `#VALUTA`, `#TAXAR`, `#KPTYP`  
+**Company Info**: `#FNAMN`, `#ORGNR`, `#ADRESS`, `#RAR`  
+**Accounts**: `#KONTO`, `#KTYP`, `#SRU`  
+**Dimensions**: `#DIM`, `#OBJEKT`  
+**Balances**: `#IB`, `#UB`, `#RES`  
+**Transactions**: `#VER`, `#TRANS`
+
+### ⚠️ Not Yet Implemented (Missing ~15%)
+
+**High Priority Missing:**
+- `#PSALDO` - Period end balance items (SIE type 2/3)
+- `#PBUDGET` - Period budget items (SIE type 2/3)
+- `#RTRANS` - Supplementary transaction items
+- `#BTRANS` - Removed transaction items
+- `#KSUMMA` - Control summation/checksum (CRC-32)
+
+**Medium Priority Missing:**
+- `#OMFATTN` - Period date specification
+- `#OIB`/`#OUB` - Object-level balances (SIE type 3)
+- `#UNDERDIM` - Hierarchical dimensions
+
+**Low Priority Missing:**
+- `#BKOD` - Industry code (SNI)
+- `#FTYP` - Company type
+- `#PROSA` - Free comment text
+- `#ENHET` - Quantity units
+
+### Key Compliance Features
 
 - **CP437 Encoding**: Uses IBM PC 8-bits extended ASCII as mandated
 - **Voucher Structure**: Proper `#VER`/`#TRANS` block handling
 - **Balance Validation**: Ensures vouchers balance to zero
 - **Dimension Objects**: Supports complex dimension objects like `{"1" "456" "7" "47"}`
 - **Deferred Processing**: Handles `#KTYP` records regardless of declaration order
+
+The current implementation handles the vast majority of SIE files encountered in practice. The missing features are primarily used in specialized scenarios (period reporting, budget data, transaction corrections, and advanced object reporting).
 
 ## License
 

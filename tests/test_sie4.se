@@ -1,0 +1,92 @@
+#FLAGGA 0
+#PROGRAM Test SIE4 Generator
+#FORMAT PC8
+#GEN 20240315
+#SIETYP 4
+#FNAMN "Testf”retag AB"
+#ORGNR 556677-8899
+#ADRESS "Testf”retag AB" "Testgatan 1" "123 45 Stockholm" "08-123 45 67"
+#RAR 0 20240101 20241231
+#RAR -1 20230101 20231231
+#KPTYP EUBAS97
+#VALUTA SEK
+#TAXAR 2024
+
+#KTYP 1510 I
+
+#KONTO 1010 "Utvecklingsutgifter"
+#KONTO 1110 "Byggnader"
+#KONTO 1210 "Maskiner och tekniska anl„ggningar"
+#KONTO 1410 "Lager av r†varor"
+#KONTO 1510 "Kundfordringar (Asset according to BAS but Income since KTYP I)"
+#KONTO 1910 "Kassa"
+#KONTO 1920 "Bank"
+#KONTO 2440 "Ing†ende moms"
+#KONTO 2441 "Utg†ende moms"
+#KONTO 2442 "Moms, redovisningskonto"
+#KONTO 2610 "Leverant”rsskulder"
+#KONTO 2710 "Skatteskulder"
+#KONTO 2731 "Arbetsgivaravgifter"
+#KONTO 2732 "Skatteavdrag"
+#KONTO 3010 "F”rs„ljning inom Sverige (Revenue according to BAS but Liability since KTYP S)"
+
+#KTYP 3010 S
+
+#KONTO 3020 "F”rs„ljning till EU-l„nder"
+#KONTO 3030 "F”rs„ljning till ”vriga l„nder"
+#KONTO 3050 "™vriga f”rs„ljningsint„kter"
+#KONTO 4010 "Kostnader f”r r†varor"
+#KONTO 4020 "Kostnader f”r tillsatsmaterial"
+#KONTO 4040 "Kostnader f”r ”vriga externa tj„nster"
+#KONTO 4050 "Hyra av lokaler"
+#KONTO 5010 "L”ner till arbetare"
+#KONTO 5020 "L”ner till tj„nstem„n"
+#KONTO 5060 "Sociala avgifter"
+#KONTO 6010 "F”rs„ljningskostnader"
+#KONTO 7010 "Kostnader f”r administration"
+#KONTO 8010 "Finansiella int„kter"
+#KONTO 8020 "Finansiella kostnader"
+#KONTO 8050 "Valutakursdifferenser"
+
+#VER A 1 20240315 "Testverifikation 1"
+{
+#TRANS 1910 {} -1000.00 "Kontantbetalning"
+#TRANS 2440 {} 200.00 "Ing†ende moms"
+#TRANS 4010 {} 800.00 "Kostnader f”r r†varor"
+}
+
+#VER A 2 20240315 "Testverifikation 2"
+{
+#TRANS 3010 {} 1250.00 "F”rs„ljning"
+#TRANS 2441 {} 250.00 "Utg†ende moms"
+#TRANS 1510 {} -1500.00 "Kundfordringar"
+}
+
+#VER A 3 20240315 "Testverifikation 3"
+{
+#TRANS 1920 {} 1500.00 "Bankins„ttning"
+#TRANS 1510 {} -1500.00 "Kundfordringar"
+}
+
+#VER A 4 20240315 "Testverifikation 4"
+{
+#TRANS 2610 {} -800.00 "Leverant”rsskuld"
+#TRANS 2440 {} -200.00 "Ing†ende moms"
+#TRANS 1920 {} 1000.00 "Bankins„ttning"
+}
+
+#VER A 5 20240315 "Testverifikation 5"
+{
+#TRANS 5010 {} -5000.00 "L”ner"
+#TRANS 2731 {} -1250.00 "Arbetsgivaravgifter"
+#TRANS 2732 {} 1250.00 "Skatteavdrag"
+#TRANS 1920 {} 5000.00 "Bankins„ttning"
+}
+
+#VER A 6 20240315 "Testverifikation 6"
+{
+#TRANS 8010 {} 1000.00 "R„nteint„kter"
+#TRANS 8020 {} -500.00 "R„ntekostnader"
+#TRANS 8050 {} -200.00 "Valutakursdifferens"
+#TRANS 1920 {} -300.00 "Bank"
+} 

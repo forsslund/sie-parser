@@ -290,7 +290,11 @@ def parse_sie(file: TextIO) -> SieFile:
     content = file.read()
     if content.startswith('\ufeff'):  # Remove BOM if present
         content = content[1:]
-    
+
+    # Normalize tabs to spaces for consistent parsing
+    # Some SIE generators (like WintAccounting) use tabs instead of spaces
+    content = content.replace('\t', ' ')
+
     lines = content.splitlines()
     current_voucher = None
     in_voucher_block = False

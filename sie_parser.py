@@ -113,6 +113,7 @@ class SieEntry:
     amount: float
     description: str
     voucher_index: Optional[str] = None
+    dimensions: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -534,14 +535,47 @@ def parse_sie(file: TextIO) -> SieFile:
                             amount_str = remaining_parts[0]
                             if amount_str and amount_str != '{}':
                                 amount = float(amount_str.replace(',', '.'))
-                        
-                        # Create entry (we store object_list for future use but don't parse it fully yet)
+
+                        # Parse dimensions from object_list
+                        # Format: dimension_id "object_id" [dimension_id "object_id" ...]
+                        # Example: 6 "102" means dimension 6, object 102
+                        dimensions = {}
+                        if object_list:
+                            # Split by spaces but keep quoted strings together
+                            parts_list = []
+                            current_part = ""
+                            in_quotes = False
+                            for char in object_list:
+                                if char == '"':
+                                    in_quotes = not in_quotes
+                                elif char == ' ' and not in_quotes:
+                                    if current_part:
+                                        parts_list.append(current_part)
+                                        current_part = ""
+                                    continue
+                                current_part += char
+                            if current_part:
+                                parts_list.append(current_part)
+
+                            # Parse pairs of dimension_id and "object_id"
+                            i = 0
+                            while i < len(parts_list):
+                                if i + 1 < len(parts_list):
+                                    dim_id = parts_list[i]
+                                    obj_id = parts_list[i + 1].strip('"')
+                                    dimensions[dim_id] = obj_id
+                                    i += 2
+                                else:
+                                    break
+
+                        # Create entry with dimensions
                         entry = SieEntry(
                             date=current_voucher['date'],
                             account_number=account_number,
                             amount=amount,
                             description=current_voucher['description'],
-                            voucher_index=f"{current_voucher['voucher_series']}{current_voucher['voucher_index']}"
+                            voucher_index=f"{current_voucher['voucher_series']}{current_voucher['voucher_index']}",
+                            dimensions=dimensions
                         )
                         sie_file.entries.append(entry)
                         

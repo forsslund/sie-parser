@@ -178,27 +178,61 @@ def show_summary(sie_data: sie_parser.SieFile, csv_output: bool = False) -> None
             print(f"  Dimension Objects: {summary_data['objects']}")
 
 
-def list_vouchers(sie_data: sie_parser.SieFile, csv_output: bool = False) -> None:
+def list_vouchers(sie_data: sie_parser.SieFile, csv_output: bool = False, detailed: bool = False) -> None:
     """List all vouchers with their transaction summaries."""
-    
+
     # Group transactions by voucher
     vouchers: Dict[str, List[sie_parser.SieEntry]] = defaultdict(list)
     for entry in sie_data.entries:
         if entry.voucher_index:
             vouchers[entry.voucher_index].append(entry)
-    
-    # Prepare voucher data
+
+    # If detailed view is requested and not CSV, show transaction details
+    if detailed and not csv_output:
+        # Sort vouchers by index
+        sorted_vouchers = sorted(vouchers.items(), key=lambda x: x[0])
+
+        for voucher_index, entries in sorted_vouchers:
+            # Get voucher metadata from first entry
+            date = entries[0].date if entries and entries[0].date else ""
+            description = entries[0].description if entries else ""
+            balance = sum(entry.amount for entry in entries)
+
+            # Print voucher header
+            print(f"\nVoucher {voucher_index} - {date} - {description}")
+            print(f"{'Account':<10} {'Account Name':<30} {'Amount':<15} {'Comment':<30}")
+            print("-" * 90)
+
+            # Print each transaction
+            for entry in entries:
+                account = sie_data.accounts.get(entry.account_number)
+                account_name = account.name if account else "Unknown"
+                comment = entry.comment or ""
+
+                print(f"{entry.account_number:<10} {account_name:<30} {entry.amount:>15.2f} {comment:<30}")
+
+            # Print voucher footer with balance
+            balanced = "Balanced" if abs(balance) < 0.01 else f"Unbalanced ({balance:.2f})"
+            print("-" * 90)
+            print(f"Balance: {balanced}")
+
+        print(f"\nTotal vouchers: {len(vouchers)}")
+        balanced_count = sum(1 for entries in vouchers.values() if abs(sum(e.amount for e in entries)) < 0.01)
+        print(f"Balanced vouchers: {balanced_count}/{len(vouchers)}")
+        return
+
+    # Prepare voucher data for summary view
     voucher_data = []
     for voucher_index, entries in vouchers.items():
         total_amount = sum(abs(entry.amount) for entry in entries)
         balance = sum(entry.amount for entry in entries)
-        
+
         # Get voucher description from first entry
         description = entries[0].description if entries else ""
-        
+
         # Get voucher date from first entry
         date = entries[0].date if entries and entries[0].date else ""
-        
+
         voucher_data.append({
             'voucher': voucher_index,
             'date': date,
@@ -208,10 +242,10 @@ def list_vouchers(sie_data: sie_parser.SieFile, csv_output: bool = False) -> Non
             'balance': balance,
             'balanced': 'Yes' if abs(balance) < 0.01 else 'No'
         })
-    
+
     # Sort by voucher index
     voucher_data.sort(key=lambda x: x['voucher'])
-    
+
     if csv_output:
         writer = csv.DictWriter(sys.stdout, fieldnames=['voucher', 'date', 'description', 'transactions', 'total_amount', 'balance', 'balanced'])
         writer.writeheader()
@@ -223,7 +257,7 @@ def list_vouchers(sie_data: sie_parser.SieFile, csv_output: bool = False) -> Non
             print(f"{voucher['voucher']:<10} {voucher['date']:<10} {voucher['description']:<25} "
                   f"{voucher['transactions']:>6} {voucher['total_amount']:>12.2f} "
                   f"{voucher['balance']:>12.2f} {voucher['balanced']:<5}")
-        
+
         print(f"\nTotal vouchers: {len(voucher_data)}")
         balanced_count = sum(1 for v in voucher_data if v['balanced'] == 'Yes')
         print(f"Balanced vouchers: {balanced_count}/{len(voucher_data)}")
@@ -240,18 +274,21 @@ Examples:
   %(prog)s accounts file.sie                   # List all accounts
   %(prog)s accounts file.sie --non-zero        # List only accounts with balances
   %(prog)s accounts file.sie --csv             # Output as CSV
-  %(prog)s vouchers file.sie                   # List all vouchers
+  %(prog)s vouchers file.sie                   # List all vouchers (summary)
+  %(prog)s vouchers file.sie --detailed        # Show detailed voucher view with transaction comments
   %(prog)s vouchers file.sie --csv             # Output vouchers as CSV
         """
     )
     
-    parser.add_argument('command', choices=['accounts', 'vouchers', 'summary'], 
+    parser.add_argument('command', choices=['accounts', 'vouchers', 'summary'],
                        help='Command to execute')
     parser.add_argument('file', help='SIE file to analyze')
-    parser.add_argument('--csv', action='store_true', 
+    parser.add_argument('--csv', action='store_true',
                        help='Output in CSV format')
     parser.add_argument('--non-zero', action='store_true',
                        help='For accounts: only show accounts with non-zero balances')
+    parser.add_argument('--detailed', action='store_true',
+                       help='For vouchers: show detailed transaction view with comments')
     parser.add_argument('--encoding', default='cp437',
                        help='File encoding (default: cp437 per SIE specification)')
     
@@ -265,7 +302,7 @@ Examples:
         if args.command == 'accounts':
             list_accounts(sie_data, non_zero_only=args.non_zero, csv_output=args.csv)
         elif args.command == 'vouchers':
-            list_vouchers(sie_data, csv_output=args.csv)
+            list_vouchers(sie_data, csv_output=args.csv, detailed=args.detailed)
         elif args.command == 'summary':
             show_summary(sie_data, csv_output=args.csv)
             

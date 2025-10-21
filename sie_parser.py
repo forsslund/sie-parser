@@ -114,6 +114,7 @@ class SieEntry:
     description: str
     voucher_index: Optional[str] = None
     dimensions: Dict[str, str] = field(default_factory=dict)
+    comment: str = ""  # Transaction-specific comment (transtext field)
 
 
 @dataclass
@@ -529,12 +530,27 @@ def parse_sie(file: TextIO) -> SieFile:
                             remaining = rest
                         
                         # Parse remaining fields: amount [transdate] [transtext] [quantity] [sign]
-                        remaining_parts = remaining.split()
+                        # We need to be careful with quoted strings in transtext
                         amount = 0.0
+                        transtext = ""
+
+                        # First, extract amount (always first field)
+                        remaining_parts = remaining.split(None, 1)  # Split on first whitespace only
                         if remaining_parts:
                             amount_str = remaining_parts[0]
                             if amount_str and amount_str != '{}':
                                 amount = float(amount_str.replace(',', '.'))
+
+                            # Now parse the rest for optional fields
+                            if len(remaining_parts) > 1:
+                                rest_of_line = remaining_parts[1].strip()
+
+                                # Try to extract transtext (can be a date or a quoted string)
+                                # Format: [transdate] [transtext] [quantity] [sign]
+                                # We need to find quoted strings
+                                quote_match = re.search(r'"([^"]*)"', rest_of_line)
+                                if quote_match:
+                                    transtext = quote_match.group(1)
 
                         # Parse dimensions from object_list
                         # Format: dimension_id "object_id" [dimension_id "object_id" ...]
@@ -568,14 +584,15 @@ def parse_sie(file: TextIO) -> SieFile:
                                 else:
                                     break
 
-                        # Create entry with dimensions
+                        # Create entry with dimensions and comment
                         entry = SieEntry(
                             date=current_voucher['date'],
                             account_number=account_number,
                             amount=amount,
                             description=current_voucher['description'],
                             voucher_index=f"{current_voucher['voucher_series']}{current_voucher['voucher_index']}",
-                            dimensions=dimensions
+                            dimensions=dimensions,
+                            comment=transtext
                         )
                         sie_file.entries.append(entry)
                         

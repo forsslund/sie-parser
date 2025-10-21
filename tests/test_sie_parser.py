@@ -381,7 +381,7 @@ def test_cp437_encoding_requirement():
 
 def test_specification_compliance():
     """Test compliance with key SIE 4B specification requirements.
-    
+
     Validates voucher structure, balance requirements, and data integrity.
     """
     # FORMAT field should specify PC8
@@ -392,7 +392,7 @@ def test_specification_compliance():
 '''
     result = sie_parser.parse_sie(StringIO(sie_content))
     assert result.file_format == "PC8"
-    
+
     # VER must be followed by TRANS items within braces
     sie_content = '''#FLAGGA 0
 #FORMAT PC8
@@ -409,15 +409,88 @@ def test_specification_compliance():
 '''
     result = sie_parser.parse_sie(StringIO(sie_content))
     assert len(result.entries) == 3
-    
+
     # All transactions should have same voucher index
     voucher_indices = {e.voucher_index for e in result.entries}
     assert len(voucher_indices) == 1
     assert "A1" in voucher_indices
-    
+
     # Verifications should balance (sum to zero)
     total_amount = sum(e.amount for e in result.entries)
     assert abs(total_amount) < 0.01
+
+
+def test_transaction_comments():
+    """Test parsing of transaction-specific comments (transtext field).
+
+    Per SIE 4B specification, TRANS format is:
+    #TRANS account_no {object_list} amount [transdate] [transtext] [quantity] [sign]
+
+    This tests that the optional transtext field is properly extracted and stored.
+    """
+    # Transaction with comment (quoted transtext)
+    sie_content = '''#FLAGGA 0
+#FORMAT PC8
+#SIETYP 4
+#KONTO 1910 "Kassa"
+#KONTO 2440 "Moms"
+#KONTO 4010 "Kostnader"
+#VER A 1 20240315 "Testverifikation 1"
+{
+#TRANS 1910 {} -1000.00 "Kontantbetalning"
+#TRANS 2440 {} 200.00 "Ingående moms"
+#TRANS 4010 {} 800.00 "Kostnader för råvaror"
+}
+'''
+    result = sie_parser.parse_sie(StringIO(sie_content))
+    assert len(result.entries) == 3
+
+    # Verify each transaction has the correct comment
+    kassa_entry = next((e for e in result.entries if e.account_number == "1910"), None)
+    assert kassa_entry is not None
+    assert kassa_entry.comment == "Kontantbetalning"
+    assert kassa_entry.description == "Testverifikation 1"  # Voucher-level description
+
+    moms_entry = next((e for e in result.entries if e.account_number == "2440"), None)
+    assert moms_entry is not None
+    assert moms_entry.comment == "Ingående moms"
+
+    kostnader_entry = next((e for e in result.entries if e.account_number == "4010"), None)
+    assert kostnader_entry is not None
+    assert kostnader_entry.comment == "Kostnader för råvaror"
+
+    # Transaction without comment (should have empty string)
+    sie_content = '''#FLAGGA 0
+#FORMAT PC8
+#SIETYP 4
+#KONTO 1910 "Kassa"
+#VER A 2 20240316 "Test without comment"
+{
+#TRANS 1910 {} 500.00
+}
+'''
+    result = sie_parser.parse_sie(StringIO(sie_content))
+    assert len(result.entries) == 1
+    assert result.entries[0].comment == ""
+    assert result.entries[0].description == "Test without comment"
+
+    # Transaction with dimensions and comment
+    sie_content = '''#FLAGGA 0
+#FORMAT PC8
+#SIETYP 4
+#DIM 6 "Projekt"
+#OBJEKT 6 "102" "Projekt A"
+#KONTO 7010 "Löner"
+#VER A 3 20240317 "Löneutbetalning"
+{
+#TRANS 7010 {6 "102"} 13200.00 "Månadslön mars"
+}
+'''
+    result = sie_parser.parse_sie(StringIO(sie_content))
+    assert len(result.entries) == 1
+    assert result.entries[0].comment == "Månadslön mars"
+    assert result.entries[0].dimensions == {"6": "102"}
+    assert result.entries[0].description == "Löneutbetalning"
 
 
 if __name__ == "__main__":

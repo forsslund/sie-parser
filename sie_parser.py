@@ -114,6 +114,8 @@ class SieEntry:
     description: str
     voucher_index: Optional[str] = None
     dimensions: Dict[str, str] = field(default_factory=dict)
+    transaction_text: Optional[str] = None  # Text specific to this transaction (e.g., "8058 kWh")
+    quantity: Optional[float] = None  # Quantity field from TRANS record
 
 
 @dataclass
@@ -269,6 +271,32 @@ def _extract_quoted_value(line: str) -> str:
     """Extract value between quotes from a line"""
     match = re.search(r'"([^"]*)"', line)
     return match.group(1) if match else ""
+
+
+def _split_respecting_quotes(text: str) -> list:
+    """
+    Split a string by spaces while respecting quoted strings.
+    Example: '4884.58 "" "8058 kWh" 0' -> ['4884.58', '""', '"8058 kWh"', '0']
+    """
+    parts_list = []
+    current_part = ""
+    in_quotes = False
+
+    for char in text:
+        if char == '"':
+            in_quotes = not in_quotes
+            current_part += char
+        elif char == ' ' and not in_quotes:
+            if current_part:
+                parts_list.append(current_part)
+                current_part = ""
+        else:
+            current_part += char
+
+    if current_part:
+        parts_list.append(current_part)
+
+    return parts_list
 
 
 # Main Parser Functions
@@ -529,12 +557,33 @@ def parse_sie(file: TextIO) -> SieFile:
                             remaining = rest
                         
                         # Parse remaining fields: amount [transdate] [transtext] [quantity] [sign]
-                        remaining_parts = remaining.split()
+                        # Use quote-aware splitting to handle quoted strings like "8058 kWh"
+                        remaining_parts = _split_respecting_quotes(remaining)
                         amount = 0.0
+                        transaction_text = None
+                        quantity = None
+
+                        # Parse amount (index 0, required)
                         if remaining_parts:
                             amount_str = remaining_parts[0]
                             if amount_str and amount_str != '{}':
                                 amount = float(amount_str.replace(',', '.'))
+
+                        # Parse transdate (index 1, optional - skip it)
+
+                        # Parse transtext (index 2, optional)
+                        if len(remaining_parts) > 2:
+                            text = remaining_parts[2].strip('"')
+                            if text:  # Only store non-empty text
+                                transaction_text = text
+
+                        # Parse quantity (index 3, optional)
+                        if len(remaining_parts) > 3:
+                            try:
+                                qty_str = remaining_parts[3].replace(',', '.')
+                                quantity = float(qty_str)
+                            except (ValueError, AttributeError):
+                                pass  # Ignore invalid quantity values
 
                         # Parse dimensions from object_list
                         # Format: dimension_id "object_id" [dimension_id "object_id" ...]
@@ -568,14 +617,16 @@ def parse_sie(file: TextIO) -> SieFile:
                                 else:
                                     break
 
-                        # Create entry with dimensions
+                        # Create entry with dimensions, transaction_text, and quantity
                         entry = SieEntry(
                             date=current_voucher['date'],
                             account_number=account_number,
                             amount=amount,
                             description=current_voucher['description'],
                             voucher_index=f"{current_voucher['voucher_series']}{current_voucher['voucher_index']}",
-                            dimensions=dimensions
+                            dimensions=dimensions,
+                            transaction_text=transaction_text,
+                            quantity=quantity
                         )
                         sie_file.entries.append(entry)
                         

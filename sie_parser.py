@@ -128,6 +128,21 @@ class SieBalance:
 
 
 @dataclass
+class SiePeriodBalance:
+    """Represents a periodic balance record (#PSALDO).
+
+    Unlike SieBalance (which uses period as -1/0 for years),
+    PSALDO uses YYYYMM format for specific months.
+    """
+    account_number: str
+    period: str  # YYYYMM format (e.g., "202511")
+    year_index: int  # 0 = current fiscal year, -1 = previous, etc.
+    amount: float  # Amount in ören (needs /100 to get kronor)
+    quantity: float = 0.0
+    dimensions: Dict[str, str] = field(default_factory=dict)  # {dim_no: obj_id}
+
+
+@dataclass
 class SieDimension:
     """Represents a dimension definition."""
     number: str
@@ -174,6 +189,7 @@ class SieFile:
     opening_balances: List[SieBalance] = field(default_factory=list)
     closing_balances: List[SieBalance] = field(default_factory=list)
     result_balances: List[SieBalance] = field(default_factory=list)
+    period_balances: List[SiePeriodBalance] = field(default_factory=list)
     dimensions: Dict[str, SieDimension] = field(default_factory=dict)
     objects: Dict[str, SieObject] = field(default_factory=dict)
     metadata: Dict[str, str] = field(default_factory=dict)
@@ -297,6 +313,14 @@ def _split_respecting_quotes(text: str) -> list:
         parts_list.append(current_part)
 
     return parts_list
+
+
+def _normalize_object_id(value: str) -> str:
+    """Normalize SIE object IDs to a canonical format without wrapping quotes."""
+    value = value.strip()
+    if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+        return value[1:-1]
+    return value
 
 
 # Main Parser Functions
@@ -450,7 +474,7 @@ def parse_sie(file: TextIO) -> SieFile:
                 parts = line.split(' ', 3)
                 if len(parts) >= 4:
                     dimension = parts[1]
-                    obj_number = parts[2]
+                    obj_number = _normalize_object_id(parts[2])
                     obj_name = parts[3].strip()
                     if obj_name.startswith('"') and obj_name.endswith('"'):
                         obj_name = obj_name[1:-1]
@@ -497,6 +521,70 @@ def parse_sie(file: TextIO) -> SieFile:
                         period=period,
                         amount=amount,
                         quantity=quantity
+                    ))
+            elif line.startswith('#PSALDO'):
+                # Parse periodic balances
+                # Format: #PSALDO year_index period account {dimensions} amount quantity
+                # Example: #PSALDO 0 202511 3230 {} -99334.05 0
+                # Example: #PSALDO 0 202511 3230 {1 "CS"} -65000 0
+
+                parts = line.split(' ', 4)  # Split: #PSALDO, year_index, period, account, rest
+                if len(parts) >= 5:
+                    year_index = int(parts[1])
+                    period = parts[2]  # YYYYMM
+                    account_number = parts[3]
+                    rest = parts[4].strip()
+
+                    # Parse dimensions and amount
+                    dimensions = {}
+                    amount = 0.0
+                    quantity = 0.0
+
+                    if rest.startswith('{'):
+                        # Find closing brace
+                        brace_end = rest.find('}')
+                        if brace_end != -1:
+                            dim_str = rest[1:brace_end]  # Content between {}
+                            remaining = rest[brace_end + 1:].strip()
+
+                            # Parse dimensions: {1 "CS" 6 "PROJECT1"}
+                            if dim_str:
+                                dim_parts = []
+                                in_quote = False
+                                current = ""
+                                for char in dim_str:
+                                    if char == '"':
+                                        in_quote = not in_quote
+                                    elif char == ' ' and not in_quote:
+                                        if current:
+                                            dim_parts.append(current)
+                                            current = ""
+                                    else:
+                                        current += char
+                                if current:
+                                    dim_parts.append(current)
+
+                                # Pair up dimension numbers with object IDs
+                                for i in range(0, len(dim_parts), 2):
+                                    if i + 1 < len(dim_parts):
+                                        dim_no = dim_parts[i]
+                                        obj_id = _normalize_object_id(dim_parts[i + 1])
+                                        dimensions[dim_no] = obj_id
+
+                            # Parse amount and quantity from remaining
+                            amt_parts = remaining.split()
+                            if amt_parts:
+                                amount = float(amt_parts[0].replace(',', '.'))
+                                if len(amt_parts) > 1:
+                                    quantity = float(amt_parts[1].replace(',', '.'))
+
+                    sie_file.period_balances.append(SiePeriodBalance(
+                        account_number=account_number,
+                        period=period,
+                        year_index=year_index,
+                        amount=amount,
+                        quantity=quantity,
+                        dimensions=dimensions
                     ))
             elif line.startswith('#VER'):
                 # Start of a new voucher - only set if not already in a voucher block
@@ -611,7 +699,7 @@ def parse_sie(file: TextIO) -> SieFile:
                             while i < len(parts_list):
                                 if i + 1 < len(parts_list):
                                     dim_id = parts_list[i]
-                                    obj_id = parts_list[i + 1].strip('"')
+                                    obj_id = _normalize_object_id(parts_list[i + 1])
                                     dimensions[dim_id] = obj_id
                                     i += 2
                                 else:
@@ -728,6 +816,7 @@ __all__ = [
     "SieAccount",
     "SieEntry",
     "SieBalance",
+    "SiePeriodBalance",
     "SieDimension",
     "SieObject",
     # Enums
@@ -738,4 +827,4 @@ __all__ = [
     # Utility functions
     "get_bas_account_type",
     "validate_entry_balance",
-] 
+]

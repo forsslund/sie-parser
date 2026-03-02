@@ -165,7 +165,8 @@ class SieFile:
     company_id: str = ""
     period_start: str = ""
     period_end: str = ""
-    
+    fiscal_years: Dict[int, tuple] = field(default_factory=dict)  # {year_no: (start, end)}
+
     # File metadata
     file_flag: str = ""
     file_format: str = ""
@@ -431,10 +432,13 @@ def parse_sie(file: TextIO) -> SieFile:
                 parts = line.split(' ')
                 if len(parts) >= 3:
                     period = int(parts[1]) if parts[1].lstrip('-').isdigit() else 0
-                    # Only use period 0 (current year) for the main period dates
+                    start = parts[2]
+                    end = parts[3] if len(parts) > 3 else ""
+                    sie_file.fiscal_years[period] = (start, end)
+                    # Keep period_start/period_end for backward compat
                     if period == 0:
-                        sie_file.period_start = parts[2]
-                        sie_file.period_end = parts[3] if len(parts) > 3 else ""
+                        sie_file.period_start = start
+                        sie_file.period_end = end
             elif line.startswith('#KONTO'):
                 # Extract account number and name, handling both quoted and unquoted names
                 parts = line.split(' ', 2)  # Split into max 3 parts
